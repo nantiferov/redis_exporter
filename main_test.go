@@ -402,19 +402,21 @@ func TestSetupLogging(t *testing.T) {
 
 func TestCreatePrometheusRegistry(t *testing.T) {
 	tests := []struct {
-		name             string
-		redisMetricsOnly bool
-		description      string
+		name              string
+		redisMetricsOnly  bool
+		extendedGoMetrics bool
+		description       string
 	}{
-		{"redis metrics only", true, "should create registry with only Redis metrics"},
-		{"all metrics", false, "should create registry with process and Go metrics"},
+		{"redis metrics only", true, false, "should create registry with only Redis metrics"},
+		{"redis + process metrics", false, false, "should create registry with Redis and process metrics"},
+		{"all metrics", false, true, "should create registry with process and Go metrics"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			registry := createPrometheusRegistry(tt.redisMetricsOnly)
+			registry := createPrometheusRegistry(tt.redisMetricsOnly, tt.extendedGoMetrics)
 			if registry == nil {
-				t.Errorf("createPrometheusRegistry(%v) returned nil registry", tt.redisMetricsOnly)
+				t.Errorf("createPrometheusRegistry(%v, %v) returned nil registry", tt.redisMetricsOnly, tt.extendedGoMetrics)
 			}
 
 			// Verify it's a valid Prometheus registry (it's already *prometheus.Registry)
@@ -422,14 +424,14 @@ func TestCreatePrometheusRegistry(t *testing.T) {
 			// Basic functionality test - gather metrics
 			metricFamilies, err := registry.Gather()
 			if err != nil {
-				t.Errorf("createPrometheusRegistry(%v) registry.Gather() error: %v", tt.redisMetricsOnly, err)
+				t.Errorf("createPrometheusRegistry(%v, %v) registry.Gather() error: %v", tt.redisMetricsOnly, tt.extendedGoMetrics, err)
 			}
 
 			// When redisMetricsOnly=false, we should have process/Go metrics
 			// When redisMetricsOnly=true, we should have fewer (or no) built-in metrics
 			if !tt.redisMetricsOnly {
 				if len(metricFamilies) == 0 {
-					t.Errorf("createPrometheusRegistry(false) expected process/Go metrics but got none")
+					t.Errorf("createPrometheusRegistry(%v, %v) expected process/Go metrics but got none", tt.redisMetricsOnly, tt.extendedGoMetrics)
 				}
 			}
 		})
@@ -484,7 +486,7 @@ func TestMainFunctionsIntegration(t *testing.T) {
 	}
 
 	// Test registry creation
-	registry := createPrometheusRegistry(true)
+	registry := createPrometheusRegistry(true, false)
 	if registry == nil {
 		t.Error("Registry creation failed")
 	}
